@@ -10,9 +10,6 @@ const nextConfig: NextConfig = {
   experimental: {
     agentUpgrade: "security",
   },
-  env: {
-    NEXT_PUBLIC_PROD: process.env.PROD ?? "false",
-  },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

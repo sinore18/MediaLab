@@ -20,10 +20,6 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 500
     max_video_duration_seconds: int = 600
     max_audio_duration_seconds: int = 600
-    azure_storage_account_name: str = ""
-    azure_storage_account_key: SecretStr = SecretStr("")
-    azure_storage_container: str = "bleeper-media"
-    azure_sas_expiry_minutes: int = 15
     stt_provider: str = "vachana"
     stt_api_key: SecretStr = SecretStr("")
     stt_language_code: str = "indic-auto"
@@ -37,10 +33,6 @@ class Settings(BaseSettings):
     @property
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
-
-    @property
-    def blob_storage_configured(self) -> bool:
-        return bool(self.azure_storage_account_name and self.azure_storage_account_key.get_secret_value())
 
 
 @lru_cache

@@ -1,17 +1,15 @@
 "use client";
 
-import { ArrowRight, AudioLines, Check, Clock3, Download, FileVideo2, LockKeyhole, Pause, Play, ShieldCheck, UploadCloud, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowRight, AudioLines, Check, Clock3, Download, FileVideo2, Pause, Play, ShieldCheck, UploadCloud, Volume2, VolumeX, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 10 * 60;
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
-const IS_PROD = process.env.NEXT_PUBLIC_PROD === "true";
 
 type SelectedVideo = { file: File; durationSeconds: number };
 type UploadState = "idle" | "uploading" | "done" | "error";
-type UploadGrant = { blob_name: string; upload_url: string; expires_at: string };
 type BleepSpan = { start: number; end: number };
 
 function parseBleepTimestamps(header: string | null): number[] {
@@ -153,64 +151,27 @@ export default function Home() {
   async function uploadVideo() {
     if (!video) return;
     setUploadState("uploading");
-    setMessage(IS_PROD ? "Preparing a secure upload..." : "Processing video locally...");
+    setMessage("Processing video...");
     try {
-      if (!IS_PROD) {
-        const formData = new FormData();
-        formData.append("file", video.file, video.file.name);
-        const localResponse = await fetch(`${API_BASE_URL}/uploads/local`, {
-          method: "POST",
-          body: formData,
-        });
-        if (!localResponse.ok) {
-          const error = await localResponse.json().catch(() => null);
-          throw new Error(error?.detail ?? "The local video round-trip failed.");
-        }
-        const timestamps = parseBleepTimestamps(localResponse.headers.get("X-Bleep-Timestamps"));
-        const spans = parseBleepSpans(localResponse.headers.get("X-Bleep-Spans"));
-        const returnedVideo = await localResponse.blob();
-        setPreviewUrl(URL.createObjectURL(returnedVideo));
-        setBleepTimestamps(timestamps);
-        setBleepSpans(spans);
-        setUploadState("done");
-        setMessage("Processing complete. Preview or download your cleaned video.");
-        return;
-      }
-
-      const grantResponse = await fetch(`${API_BASE_URL}/uploads`, {
+      const formData = new FormData();
+      formData.append("file", video.file, video.file.name);
+      const response = await fetch(`${API_BASE_URL}/uploads`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          file_name: video.file.name,
-          content_type: video.file.type,
-          file_size_bytes: video.file.size,
-          duration_seconds: video.durationSeconds,
-        }),
+        body: formData,
       });
-      if (!grantResponse.ok) {
-        const error = await grantResponse.json().catch(() => null);
-        throw new Error(error?.detail ?? "Couldn't prepare the secure upload.");
-      }
-      const grant = (await grantResponse.json()) as UploadGrant;
-      const blobResponse = await fetch(grant.upload_url, {
-        method: "PUT",
-        headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": video.file.type },
-        body: video.file,
-      });
-      if (!blobResponse.ok) throw new Error("The video couldn't be stored. Check Blob Storage CORS settings.");
-
-      const completeResponse = await fetch(`${API_BASE_URL}/uploads/complete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blob_name: grant.blob_name }),
-      });
-      if (!completeResponse.ok) {
-        const error = await completeResponse.json().catch(() => null);
-        throw new Error(error?.detail ?? "The uploaded video couldn't be verified.");
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail ?? "The video could not be processed.");
       }
 
+      const timestamps = parseBleepTimestamps(response.headers.get("X-Bleep-Timestamps"));
+      const spans = parseBleepSpans(response.headers.get("X-Bleep-Spans"));
+      const returnedVideo = await response.blob();
+      setPreviewUrl(URL.createObjectURL(returnedVideo));
+      setBleepTimestamps(timestamps);
+      setBleepSpans(spans);
       setUploadState("done");
-      setMessage("Video stored securely. Processing providers still need to be configured on the server.");
+      setMessage("Processing complete. Preview or download your cleaned video.");
     } catch (error) {
       setUploadState("error");
       setMessage(error instanceof Error ? error.message : "The upload could not be completed.");
@@ -234,7 +195,7 @@ export default function Home() {
               <h2 className="panel-title" id="upload-title">Start with a video</h2>
               <p className="panel-caption">Choose a file to begin your cleanup.</p>
             </div>
-            <div className="secure-label">{IS_PROD ? <><LockKeyhole size={14} /> Secure upload</> : <><FileVideo2 size={14} /> Local test mode</>}</div>
+            <div className="secure-label"><FileVideo2 size={14} /> Server processing</div>
           </div>
           <div className="panel-body">
             <div
@@ -272,7 +233,7 @@ export default function Home() {
               <span className="limit-item">MP4, MOV, WebM</span>
             </div>
             <button className="submit-button" type="button" disabled={!video || uploadState === "uploading" || uploadState === "done"} onClick={() => void uploadVideo()}>
-              {uploadState === "uploading" ? (IS_PROD ? "Uploading video..." : "Processing video...") : uploadState === "done" ? (IS_PROD ? "Video uploaded" : "Processing complete") : "Upload video"}
+              {uploadState === "uploading" ? "Processing video..." : uploadState === "done" ? "Processing complete" : "Upload video"}
               {uploadState !== "uploading" && uploadState !== "done" && <ArrowRight size={16} />}
             </button>
             {message && <p className={`status-message ${uploadState === "error" ? "error" : uploadState === "done" ? "success" : ""}`} role="status">{uploadState === "done" ? <Check size={15} /> : null}{message}</p>}
@@ -394,7 +355,7 @@ export default function Home() {
               </>
             )}
           </div>
-          <div className="panel-foot">{IS_PROD ? <><LockKeyhole size={14} /> A private, time-limited upload link is used. Your file is sent directly to your Blob Storage account.</> : <><FileVideo2 size={14} /> Local test mode processes the video on the API host without Azure Blob Storage.</>}</div>
+          <div className="panel-foot"><FileVideo2 size={14} /> Your video is sent to the API for processing, then returned for preview and download.</div>
         </section>
       </div>
     </main>

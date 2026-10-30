@@ -17,11 +17,11 @@ export default function Home() {
         <nav className="landing-nav" aria-label="Main navigation">
           <a href="#how-it-works">How it works</a>
           <a href="#made-for">Made for creators</a>
-          <Link href="/transcribe">Transcribe audio</Link>
+          <a href="/transcribe">Transcribe audio</a>
         </nav>
-        <Link className="header-cta" href="/transcribe">
+        <a className="header-cta" href="/transcribe">
           Audio studio <ArrowRight size={15} />
-        </Link>
+        </a>
       </header>
 
       <section className="hero" aria-labelledby="hero-title">
@@ -35,7 +35,7 @@ export default function Home() {
             <Link className="primary-cta" href="/upload">
               Check it out <ArrowRight size={17} />
             </Link>
-            <Link className="text-cta" href="/transcribe"><AudioLines size={17} /> Transcribe audio</Link>
+            <a className="text-cta" href="/transcribe"><AudioLines size={17} /> Transcribe audio</a>
             <a className="text-cta" href="#how-it-works"><CirclePlay size={18} /> See how it works</a>
           </div>
           <div className="hero-proof">

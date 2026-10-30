@@ -224,7 +224,7 @@ export default function Home() {
           <span className="brand-mark"><FileVideo2 size={19} strokeWidth={2.2} /></span>
           <span>bleeper</span>
         </Link>
-        <div className="topbar-note"><Link href="/transcribe" className="topbar-transcribe-link"><AudioLines size={14} /> Transcribe audio</Link><ShieldCheck size={15} /> Private by design</div>
+        <div className="topbar-note"><a href="/transcribe" className="topbar-transcribe-link"><AudioLines size={14} /> Transcribe audio</a><ShieldCheck size={15} /> Private by design</div>
       </header>
 
       <div className="main-grid">

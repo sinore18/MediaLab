@@ -330,7 +330,7 @@ const result = await response.json();`;
           <span>bleeper<span className="brand-divider">/</span>studio</span>
         </Link>
         <nav className="transcribe-nav" aria-label="Studio navigation">
-          <Link className="nav-active" href="/transcribe"><Waves size={15} /> Transcription</Link>
+          <a className="nav-active" href="/transcribe"><Waves size={15} /> Transcription</a>
           <Link href="/upload"><FileAudio2 size={15} /> Video cleanup</Link>
         </nav>
         <span className="privacy-badge"><ShieldCheck size={14} /> Transcription workspace</span>

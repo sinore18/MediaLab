@@ -4,7 +4,7 @@ Video profanity-cleanup starter with a Next.js client and a Python/FastAPI API.
 
 ## Start locally
 
-1. Leave `PROD=false` in the root `.env` for local testing. This mode sends the selected video to the local API, validates its size and duration, returns it to the browser for preview, and does not call Azure.
+1. Set `PROD=false` in the root `.env` for development logging. The selected video is sent to the API, validated and processed there, then returned to the browser for preview. `PROD=true` uses the same upload and processing flow; it only changes production logging.
 2. Install FFmpeg so `ffprobe` is available on `PATH`.
 3. In one terminal, run `cd server` and `uv run server`.
 4. In another terminal, run `cd client` and `npm run dev`.
@@ -12,7 +12,7 @@ Video profanity-cleanup starter with a Next.js client and a Python/FastAPI API.
 
 The audio workspace is available at `http://localhost:3000/transcribe`. It supports microphone recording and audio uploads, then sends the audio to the configured Gnani-compatible STT provider and torchaudio MMS_FA aligner via `POST /api/v1/transcriptions`. Select Hindi or English in the workspace so Gnani and the aligner use the same language; verbatim transcription omits the video-cleanup pipeline's custom substitutions and keyword bias. Configure `STT_PROVIDER=gnani`, `STT_API_KEY`, and `STT_LANGUAGE_CODE` in the root `.env`; FFmpeg/ffprobe and the MMS_FA model dependencies must be available to the API.
 
-Set `PROD=true` to switch to Azure Blob SAS uploads. Configure the Azure account credentials in `.env`, and allow browser `PUT` from `http://localhost:3000` in Blob Storage CORS with the `x-ms-blob-type` and `content-type` headers. Restart both dev servers after changing `PROD` so the API setting and public client mode flag are refreshed.
+Set `PROD=true` to enable production logging. It does not change the upload, processing, or download architecture, and no Azure storage configuration is needed.
 
 ## Run with Docker Compose
 
@@ -54,6 +54,6 @@ The Compose services are capped at a combined 1 vCPU and 512 MB RAM: the API get
 
 ## Processing status
 
-Local mode transcribes audio, aligns the transcript with torchaudio MMS_FA for word-level timestamps, asks Gemini to identify profanity in any language, and bleeps the corresponding word or complete multi-word phrase. Gemini returns a standardized JSON object containing `profanity_spans` with inclusive token indexes and a `word` or `phrase` type. Configure `GEMINI_API_KEY` in the root `.env` (the default model is `gemini-3.5-flash-lite`). Keep Azure credentials server-only; only the non-secret production mode flag is exposed to the client.
+Video processing transcribes audio, aligns the transcript with torchaudio MMS_FA for word-level timestamps, asks Gemini to identify profanity in any language, and bleeps the corresponding word or complete multi-word phrase. Gemini returns a standardized JSON object containing `profanity_spans` with inclusive token indexes and a `word` or `phrase` type. Configure `GEMINI_API_KEY` in the root `.env` (the default model is `gemini-3.5-flash-lite`). `PROD` is a server-side logging setting and is not exposed to the client.
 
 Run API tests with `cd server && uv run pytest`. Run client checks with `cd client && npm run lint && npm run build`.

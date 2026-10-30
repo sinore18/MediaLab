@@ -10,9 +10,7 @@ WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
-ARG PROD=false
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
-ENV PROD=${PROD}
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 
 RUN npm run build

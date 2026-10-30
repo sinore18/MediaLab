@@ -1,9 +1,9 @@
 import logging
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
-
-from server.api.v1.routes import downloads, uploads
+from server.api.v1.routes import uploads
 from server.config import Settings
 from server.main import app
 from server.observability import LOG_FILE, configure_logging, log_exception
@@ -78,7 +78,7 @@ def test_logs_are_appended_to_server_log_file() -> None:
 def test_dev_http_error_reason_is_written_to_log_file() -> None:
     configure_logging(Settings(prod=False))
     response = client.post(
-        "/api/v1/uploads/local",
+        "/api/v1/uploads",
         files={"file": ("notes.txt", b"not-video", "text/plain")},
     )
 
@@ -88,49 +88,9 @@ def test_dev_http_error_reason_is_written_to_log_file() -> None:
     assert "Only video files are accepted." in LOG_FILE.read_text(encoding="utf-8")
 
 
-def test_upload_intent_rejects_oversized_video(monkeypatch) -> None:
-    monkeypatch.setattr(uploads, "get_settings", lambda: Settings(prod=True))
-    response = client.post(
-        "/api/v1/uploads",
-        json={
-            "file_name": "large.mp4",
-            "content_type": "video/mp4",
-            "file_size_bytes": 501 * 1024 * 1024,
-            "duration_seconds": 12,
-        },
-    )
-
-    assert response.status_code == 413
-
-
-def test_upload_intent_rejects_non_video_content_type() -> None:
-    response = client.post(
-        "/api/v1/uploads",
-        json={
-            "file_name": "notes.txt",
-            "content_type": "text/plain",
-            "file_size_bytes": 100,
-            "duration_seconds": 1,
-        },
-    )
-
-    assert response.status_code == 422
-
-
-def test_download_intent_rejects_non_output_blob() -> None:
-    response = client.post("/api/v1/downloads", json={"blob_name": "uploads/source.mp4"})
-
-    assert response.status_code == 422
-
-
-def test_upload_completion_rejects_non_upload_blob() -> None:
-    response = client.post("/api/v1/uploads/complete", json={"blob_name": "outputs/result.mp4"})
-
-    assert response.status_code == 422
-
-
-def test_local_upload_returns_video_without_using_azure(monkeypatch) -> None:
-    monkeypatch.setattr(uploads, "get_settings", lambda: Settings(prod=False))
+@pytest.mark.parametrize("prod", [False, True])
+def test_upload_returns_processed_video_in_every_environment(monkeypatch, prod: bool) -> None:
+    monkeypatch.setattr(uploads, "get_settings", lambda: Settings(prod=prod))
     monkeypatch.setattr(uploads.MediaProbeService, "duration_seconds", lambda _self, _path: 12.5)
 
     class FakeLocalProcessor:
@@ -142,13 +102,9 @@ def test_local_upload_returns_video_without_using_azure(monkeypatch) -> None:
                 bleep_spans=((1.25, 1.75), (4.5, 4.9)),
             )
 
-    def fail_if_azure_is_used(*_args, **_kwargs):
-        raise AssertionError("Azure must not be used in local mode")
-
-    monkeypatch.setattr(uploads, "BlobStorageService", fail_if_azure_is_used)
     monkeypatch.setattr(uploads, "create_local_video_processor", lambda _settings: FakeLocalProcessor())
     response = client.post(
-        "/api/v1/uploads/local",
+        "/api/v1/uploads",
         headers={"Origin": "http://localhost:3000"},
         files={"file": ("sample.mp4", b"video-bytes", "video/mp4")},
     )
@@ -164,39 +120,13 @@ def test_local_upload_returns_video_without_using_azure(monkeypatch) -> None:
     assert response.headers["content-disposition"] == 'attachment; filename="bleeper-processed.mp4"'
 
 
-def test_local_upload_route_is_disabled_when_prod_is_enabled(monkeypatch) -> None:
-    monkeypatch.setattr(uploads, "get_settings", lambda: Settings(prod=True))
-    response = client.post(
-        "/api/v1/uploads/local",
-        files={"file": ("sample.mp4", b"video-bytes", "video/mp4")},
-    )
-
-    assert response.status_code == 404
-
-
-def test_azure_sas_routes_are_disabled_in_local_mode(monkeypatch) -> None:
-    local_settings = lambda: Settings(prod=False)
-    monkeypatch.setattr(uploads, "get_settings", local_settings)
-    monkeypatch.setattr(downloads, "get_settings", local_settings)
-
-    def fail_if_azure_is_used(*_args, **_kwargs):
-        raise AssertionError("Azure must not be used in local mode")
-
-    monkeypatch.setattr(uploads, "BlobStorageService", fail_if_azure_is_used)
-    monkeypatch.setattr(downloads, "BlobStorageService", fail_if_azure_is_used)
-    upload_response = client.post(
-        "/api/v1/uploads",
-        json={
-            "file_name": "sample.mp4",
-            "content_type": "video/mp4",
-            "file_size_bytes": 100,
-            "duration_seconds": 1,
-        },
+def test_blob_storage_routes_are_removed() -> None:
+    upload_completion_response = client.post(
+        "/api/v1/uploads/complete", json={"blob_name": "uploads/sample.mp4"}
     )
     download_response = client.post(
-        "/api/v1/downloads",
-        json={"blob_name": "outputs/sample.mp4"},
+        "/api/v1/downloads", json={"blob_name": "outputs/sample.mp4"}
     )
 
-    assert upload_response.status_code == 404
+    assert upload_completion_response.status_code == 404
     assert download_response.status_code == 404

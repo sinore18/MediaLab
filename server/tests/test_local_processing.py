@@ -84,7 +84,7 @@ def test_vachana_transcriber_sends_audio_and_uses_only_transcript(
     assert captured["headers"]["X-API-Key-ID"] == "test-api-key-id"
     assert captured["timeout"] == 300
     assert captured["data"] == {
-        "language_code": "en-IN",
+        "language_code": "indic-auto",
         "model": "prisma-v3.0",
         "format": "transcribe",
         "itn_native_numerals": "true",

@@ -141,7 +141,7 @@ export default function TranscribePage() {
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setWorkState("error");
-      setMessage("This audio file is over the 500 MB upload limit.");
+      setMessage("This audio file is over the 100 MB upload limit.");
       return;
     }
 
@@ -476,8 +476,8 @@ const result = await response.json();`;
             )}
 
             <div className="audio-limits">
-              <span><Check size={13} /> Up to 500 MB</span>
-              <span><Clock3 size={13} /> Up to 10 minutes</span>
+              <span><Check size={13} /> Up to 100 MB</span>
+              <span><Clock3 size={13} /> Up to 30 seconds</span>
               <span>WAV, MP3, M4A, WebM</span>
             </div>
 

@@ -5,7 +5,7 @@ FastAPI service for upload authorization and video cleanup orchestration.
 
 ## Audio transcription
 
-`POST /api/v1/transcriptions` accepts an audio file as multipart field `file` and returns the transcript, media duration, and word-level start/end times. It uses the configured Gnani-compatible STT provider (`STT_PROVIDER=gnani`, or the existing `vachana` alias) with `language_code=indic-auto` for automatic language detection, followed by torchaudio MMS_FA alignment. This endpoint omits the video-cleanup pipeline's domain-specific substitutions and bias terms to keep transcripts verbatim. It accepts audio up to `MAX_UPLOAD_SIZE_MB` (500 MB by default) and `MAX_AUDIO_DURATION_SECONDS` (10 minutes by default). It requires `STT_API_KEY`, FFmpeg/ffprobe, and the alignment model dependencies. Audio is staged temporarily on the API host and removed after processing.
+`POST /api/v1/transcriptions` accepts an audio file as multipart field `file` and returns the transcript, media duration, and word-level start/end times. It uses the configured Gnani-compatible STT provider (`STT_PROVIDER=gnani`, or the existing `vachana` alias) with `language_code=indic-auto` for automatic language detection, followed by torchaudio MMS_FA alignment. This endpoint omits the video-cleanup pipeline's domain-specific substitutions and bias terms to keep transcripts verbatim. It accepts audio up to `MAX_UPLOAD_SIZE_MB` (100 MB by default) and `MAX_AUDIO_DURATION_SECONDS` (30 seconds by default). It requires `STT_API_KEY`, FFmpeg/ffprobe, and the alignment model dependencies. Audio is staged temporarily on the API host and removed after processing.
 
 ## Run locally
 

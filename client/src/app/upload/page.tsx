@@ -118,7 +118,7 @@ export default function Home() {
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setVideo(null);
       setUploadState("error");
-      setMessage("This file is over the 500 MB upload limit.");
+      setMessage("This file is over the 100 MB upload limit.");
       return;
     }
 
@@ -267,8 +267,8 @@ export default function Home() {
             )}
 
             <div className="limits">
-              <span className="limit-item"><Check size={14} /> Up to 500 MB</span>
-              <span className="limit-item"><Clock3 size={14} /> Up to 10 minutes</span>
+              <span className="limit-item"><Check size={14} /> Up to 100 MB</span>
+              <span className="limit-item"><Clock3 size={14} /> Up to 30 seconds</span>
               <span className="limit-item">MP4, MOV, WebM</span>
             </div>
             <button className="submit-button" type="button" disabled={!video || uploadState === "uploading" || uploadState === "done"} onClick={() => void uploadVideo()}>

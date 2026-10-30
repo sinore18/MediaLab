@@ -46,6 +46,10 @@ docker compose up -d server
 
 Open `http://localhost:3000`; the API is available at `http://localhost:8000`. The client image uses Next.js standalone output, and the server runtime includes FFmpeg/ffprobe. Audio, logs, and the downloaded PyTorch alignment model are stored in Compose-managed volumes. Set `NEXT_PUBLIC_API_BASE_URL` in the root `.env` to the browser-accessible API URL before building if it is not `http://localhost:8000/api/v1`.
 
+## Deploy behind Caddy
+
+The root `Caddyfile` configures Caddy on the VPS to serve `dhwani.site`, redirect `/` to `/bleeper`, and reverse proxy requests to the Compose client on `127.0.0.1:3000`. Install Caddy on the VPS and load this file as its configuration. Make sure `dhwani.site` resolves to the VPS IP and that inbound ports 80 and 443 are open; Caddy will provision HTTPS automatically.
+
 The Compose services are capped at a combined 1 vCPU and 512 MB RAM: the API gets 0.75 CPU / 384 MB and the client gets 0.25 CPU / 128 MB. These are strict container limits, not recommendations for reliable transcription. The API loads the torchaudio MMS_FA alignment model in memory, so transcription may be slow or the API may be killed for exceeding its memory limit. Increase the API memory allocation (and the overall VPS memory) if that occurs. Image builds are not subject to these runtime container limits.
 
 ## Processing status

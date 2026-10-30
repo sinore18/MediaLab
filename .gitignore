@@ -1,0 +1,61 @@
+# Client dependencies
+/client/node_modules
+/client/.pnp
+/client/.pnp.*
+/client/.yarn/*
+!/client/.yarn/patches
+!/client/.yarn/plugins
+!/client/.yarn/releases
+!/client/.yarn/versions
+
+# Testing
+/client/coverage
+
+# Next.js
+/client/.next/
+/client/out/
+
+# Production
+/client/build/
+build/
+dist/
+wheels/
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment files
+.env
+client/.env*
+!client/.env.example
+
+# Vercel
+/client/.vercel
+
+# TypeScript
+*.tsbuildinfo
+/client/next-env.d.ts
+
+# Python-generated files
+.venv/
+__pycache__/
+*.egg-info/
+
+# Runtime logs
+server/logs/*.log
+
+# Retained source audio
+server/audio/*.wav
+
+# Existing root-level rules
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+server/.venv/

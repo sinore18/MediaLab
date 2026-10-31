@@ -1,3 +1,4 @@
+import logging
 import re
 import subprocess
 import unicodedata
@@ -6,6 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from server.domain.schemas import WordTiming
+from server.services.processing.alignment_text import fill_unaligned, spoken_pieces
+
+logger = logging.getLogger(__name__)
+
+_ISO_639_3 = {
+    "en": "eng", "hi": "hin", "bn": "ben", "gu": "guj", "kn": "kan",
+    "ml": "mal", "mr": "mar", "pa": "pan", "ta": "tam", "te": "tel",
+}
 
 
 class LocalAlignmentError(RuntimeError):
@@ -33,6 +42,19 @@ class LocalMMSWordAligner:
         self.device = device
         self.language = language
         self._components: tuple[Any, Any, Any, Any] | None = None
+        self._word_cache: dict[str, list[str]] = {}
+
+    def warmup(self) -> None:
+        """Load the model and run one tiny forward pass so the first real request is not slow.
+
+        Call once at application startup (e.g. in the FastAPI lifespan, via run_in_threadpool).
+        """
+        import torch
+
+        if self._components is None:
+            self._components = _load_alignment_components(self.device)
+        with torch.inference_mode():
+            self._components[0](torch.zeros(1, 16000, device=self.device))
 
     def align(self, audio_path: Path, transcript: str) -> list[WordTiming]:
         if not transcript.strip():
@@ -47,6 +69,21 @@ class LocalMMSWordAligner:
             raise
         except Exception as error:
             raise LocalAlignmentError(f"torchaudio MMS_FA word alignment failed: {error}") from error
+
+    def _romanize_word(self, word: str, romanizer: Any) -> list[str]:
+        """Return the MMS_FA-compatible (a-z) words for one transcript word, expanding digits."""
+        cached = self._word_cache.get(word)
+        if cached is not None:
+            return cached
+        normalized: list[str] = []
+        lcode = self._romanization_language()
+        for piece in spoken_pieces(word, self.language):
+            romanized = piece if piece.isascii() else romanizer.romanize_string(piece, lcode=lcode)
+            normalized.extend(re.findall(r"[a-z]+(?:'[a-z]+)?", romanized.casefold()))
+        if len(self._word_cache) > 10_000:
+            self._word_cache.clear()
+        self._word_cache[word] = normalized
+        return normalized
 
     def _align(
         self,
@@ -63,11 +100,14 @@ class LocalMMSWordAligner:
         original_words = transcript.split()
         normalized_words: list[str] = []
         word_indexes: list[int] = []
+        unaligned: set[int] = set()  # words MMS_FA cannot place; their timing is interpolated
         for index, word in enumerate(original_words):
-            romanized = romanizer.romanize_string(word, lcode=self._romanization_language())
-            romanized_words = re.findall(r"[a-z]+(?:'[a-z]+)?", romanized.casefold())
-            if not romanized_words and any(unicodedata.category(character)[0] in {"L", "N"} for character in word):
-                raise LocalAlignmentError(f"MMS_FA cannot normalize transcript word {word!r}.")
+            romanized_words = self._romanize_word(word, romanizer)
+            if not romanized_words:
+                if any(unicodedata.category(character)[0] in {"L", "N"} for character in word):
+                    unaligned.add(index)
+                    logger.warning("MMS_FA cannot normalize transcript word %r; interpolating its timing.", word)
+                continue  # punctuation-only words are skipped, as before
             normalized_words.extend(romanized_words)
             word_indexes.extend([index] * len(romanized_words))
 
@@ -122,8 +162,8 @@ class LocalMMSWordAligner:
         if len(token_spans) != len(normalized_words):
             raise LocalAlignmentError("MMS_FA returned an unexpected number of word alignments.")
 
-        frame_duration = waveform.size(1) / bundle.sample_rate / emission.size(1)
-        timings: list[WordTiming] = []
+        audio_seconds = waveform.size(1) / bundle.sample_rate
+        frame_duration = audio_seconds / emission.size(1)
         word_frames: dict[int, tuple[int, int]] = {}
         for index, spans in zip(word_indexes, token_spans, strict=True):
             if not spans:
@@ -136,31 +176,42 @@ class LocalMMSWordAligner:
             else:
                 word_frames[index] = (start_frame, end_frame)
 
+        # A spoken word must never silently disappear (it would escape redaction): anything the
+        # aligner left without a usable timing is interpolated and flagged approximate.
+        aligned: dict[int, tuple[float, float]] = {}
+        for index in set(word_indexes):
+            frames = word_frames.get(index)
+            if frames is not None and frames[1] > frames[0]:
+                aligned[index] = (frames[0] * frame_duration, frames[1] * frame_duration)
+            else:
+                unaligned.add(index)
+                logger.warning("MMS_FA returned no usable timing for %r; interpolating.", original_words[index])
+        if not aligned:
+            raise LocalAlignmentError("MMS_FA did not return any word-level timestamps.")
+        filled = fill_unaligned(aligned, unaligned, audio_seconds)
+
+        timings: list[WordTiming] = []
         for index, word in enumerate(original_words):
-            frame_range = word_frames.get(index)
-            if frame_range is None:
-                if index in word_indexes:
-                    raise LocalAlignmentError(f"MMS_FA returned no timing for transcript word {word!r}.")
-                continue
-            start_frame, end_frame = frame_range
-            if end_frame <= start_frame:
-                continue
+            span = aligned.get(index)
+            approximate = False
+            if span is None:
+                span = filled.get(index)
+                approximate = True
+            if span is None:
+                continue  # punctuation-only word
             timings.append(
                 WordTiming(
                     word=word,
-                    start_seconds=start_frame * frame_duration,
-                    end_seconds=end_frame * frame_duration,
+                    start_seconds=span[0],
+                    end_seconds=span[1],
+                    approximate=approximate,  # add `approximate: bool = False` to WordTiming
                 )
             )
-
-        if not timings:
-            raise LocalAlignmentError("MMS_FA did not return any word-level timestamps.")
         return timings
 
     def _romanization_language(self) -> str | None:
         language = self.language.strip().lower().replace("_", "-")
         base_language = language.split("-", 1)[0]
-        iso_639_3 = {"en": "eng", "hi": "hin"}
-        if base_language in iso_639_3:
-            return iso_639_3[base_language]
+        if base_language in _ISO_639_3:
+            return _ISO_639_3[base_language]
         return base_language if len(base_language) == 3 else None

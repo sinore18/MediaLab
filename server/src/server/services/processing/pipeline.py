@@ -1,14 +1,16 @@
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from time import perf_counter
 from typing import TypeVar
 
 from server.config import get_settings
+from server.domain.schemas import AlignedWord, DetectionSpan, ProfanitySpan, WordTiming
 from server.observability import log_exception
 from server.services.processing.contracts import (
     BleepRenderer,
+    DetectorPlugin,
     ProfanityDetector,
     SpeechToTextProvider,
     WordAligner,
@@ -23,7 +25,7 @@ class ProcessingPipeline:
     def __init__(
         self,
         speech_to_text: SpeechToTextProvider,
-        profanity_detector: ProfanityDetector,
+        profanity_detector: ProfanityDetector | DetectorPlugin,
         renderer: BleepRenderer,
         word_aligner: WordAligner | None = None,
     ) -> None:
@@ -49,7 +51,7 @@ class ProcessingPipeline:
         )
         logger.info("word alignment completed word_count=%d", len(words))
         matches = self._run_step(
-            "profanity_detection", self.profanity_detector.find_matches, words
+            "profanity_detection", self._find_matches, words
         )
         logger.info(
             "profanity detection completed word_count=%d match_count=%d",
@@ -86,6 +88,42 @@ class ProcessingPipeline:
             )
         )
         return result_path, bleep_spans
+
+    def _find_matches(self, words: Sequence[WordTiming]) -> list[ProfanitySpan]:
+        """Use the plugin contract while retaining legacy detector support."""
+        detector = self.profanity_detector
+        if isinstance(detector, DetectorPlugin):
+            aligned_words = [
+                AlignedWord(
+                    word=word.word,
+                    start=word.start_seconds,
+                    end=word.end_seconds,
+                )
+                for word in words
+            ]
+            spans = detector.detect(aligned_words)
+            return [self._as_profanity_match(span, words) for span in spans]
+        return list(detector.find_matches(words))
+
+    @staticmethod
+    def _as_profanity_match(
+        span: DetectionSpan, words: Sequence[WordTiming]
+    ) -> ProfanitySpan:
+        """Adapt a generic plugin span for the existing profanity renderer."""
+        if span.last_word_idx >= len(words):
+            raise ValueError("Detector returned an out-of-range word index.")
+        if span.last_word_idx < span.first_word_idx:
+            raise ValueError("Detector returned an invalid word index range.")
+        if span.end <= span.start:
+            raise ValueError("Detector returned an invalid time range.")
+        return ProfanitySpan(
+            word=" ".join(
+                word.word for word in words[span.first_word_idx : span.last_word_idx + 1]
+            ),
+            start_seconds=span.start,
+            end_seconds=span.end,
+            kind="word" if span.first_word_idx == span.last_word_idx else "phrase",
+        )
 
     @staticmethod
     def _run_step(name: str, operation: Callable[..., T], *args: object) -> T:

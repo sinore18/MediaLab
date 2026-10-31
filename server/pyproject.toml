@@ -21,6 +21,7 @@ dependencies = [
 
 [project.scripts]
 server = "server:main"
+pii-redact = "server.services.processing.pii_cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.22,<0.13.0"]

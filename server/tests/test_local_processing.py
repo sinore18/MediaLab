@@ -8,7 +8,7 @@ import pytest
 from pydantic import SecretStr
 
 from server.config import Settings
-from server.domain.schemas import ProfanitySpan, WordTiming
+from server.domain.schemas import AlignedWord, DetectionSpan, ProfanitySpan, WordTiming
 from server.services.processing import local_processing
 from server.services.processing.local_aligner import LocalMMSWordAligner
 from server.services.processing.local_processing import (
@@ -42,6 +42,28 @@ def test_local_whisper_transcriber_uses_configured_model(
     caplog.set_level("INFO", logger=local_processing.__name__)
     assert transcriber.transcribe(audio_path) == "damn"
     assert 'provider=whisper transcript=" damn "' in caplog.text
+
+
+def test_whisper_transcriber_can_suppress_transcript_logging(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    audio_path = tmp_path / "speech.wav"
+    audio_path.touch()
+
+    class FakeModel:
+        def transcribe(self, path: str, language: str, verbose: None):
+            assert path == str(audio_path)
+            assert language == "en"
+            assert verbose is None
+            return SimpleNamespace(text="synthetic-sensitive-number")
+
+    monkeypatch.setattr(
+        local_processing, "_load_whisper_model", lambda _model, _device: FakeModel()
+    )
+    transcriber = LocalWhisperSpeechToText("tiny", "cpu", "en", log_transcript=False)
+
+    assert transcriber.transcribe(audio_path) == "synthetic-sensitive-number"
+    assert "synthetic-sensitive-number" not in caplog.text
 
 
 def test_vachana_transcriber_sends_audio_and_uses_only_transcript(
@@ -107,6 +129,16 @@ def test_vachana_transcriber_sends_audio_and_uses_only_transcript(
         "model": "prisma-v3.0",
         "format": "transcribe",
     }
+
+    caplog.clear()
+    redaction_transcriber = VachanaSpeechToText(
+        "test-api-key-id",
+        language_code="indic-auto",
+        use_domain_vocabulary=False,
+        log_transcript=False,
+    )
+    assert redaction_transcriber.transcribe(audio_path) == "नमस्ते"
+    assert "नमस्ते" not in caplog.text
 
 
 def test_vachana_transcriber_rejects_unsuccessful_response(
@@ -376,8 +408,28 @@ def test_gemini_profanity_detector_maps_standardized_word_and_phrase_spans(
         WordTiming(word="awful!", start_seconds=0.3, end_seconds=0.6),
     ]
 
+    spans = detector.detect(
+        [
+            AlignedWord(word=word.word, start=word.start_seconds, end=word.end_seconds)
+            for word in timings
+        ]
+    )
     matches = detector.find_matches(timings)
 
+    assert [
+        (
+            span.category,
+            span.first_word_idx,
+            span.last_word_idx,
+            span.start,
+            span.end,
+            span.confidence,
+        )
+        for span in spans
+    ] == [
+        ("profanity", 0, 0, 0.1, 0.2, None),
+        ("profanity", 1, 2, 0.2, 0.6, None),
+    ]
     assert matches[0].word == "That"
     assert matches[0].kind == "word"
     assert matches[0].start_seconds == 0.1
@@ -399,6 +451,56 @@ def test_gemini_profanity_detector_maps_standardized_word_and_phrase_spans(
         "end_index",
         "type",
     ]
+
+
+def test_processing_pipeline_accepts_detector_plugin() -> None:
+    class SpeechToText:
+        def transcribe(self, _audio_path: Path) -> str:
+            return "hello"
+
+    class WordAligner:
+        def align(self, _audio_path: Path, _transcript: str) -> list[WordTiming]:
+            return [WordTiming(word="hello", start_seconds=0.1, end_seconds=0.4)]
+
+    class Detector:
+        def detect(self, words: list[AlignedWord]) -> list[DetectionSpan]:
+            assert words == [AlignedWord(word="hello", start=0.1, end=0.4)]
+            return [
+                DetectionSpan(
+                    category="profanity",
+                    first_word_idx=0,
+                    last_word_idx=0,
+                    start=0.1,
+                    end=0.4,
+                    confidence=0.9,
+                )
+            ]
+
+    class Renderer:
+        def render(self, _video_path: Path, matches, output_path: Path) -> Path:
+            assert matches == [
+                ProfanitySpan(
+                    word="hello",
+                    start_seconds=0.1,
+                    end_seconds=0.4,
+                    kind="word",
+                )
+            ]
+            return output_path
+
+    pipeline = ProcessingPipeline(
+        speech_to_text=SpeechToText(),
+        word_aligner=WordAligner(),
+        profanity_detector=Detector(),
+        renderer=Renderer(),
+    )
+
+    result_path, spans = pipeline.process(
+        Path("video.mp4"), Path("speech.wav"), Path("output.mp4")
+    )
+
+    assert result_path == Path("output.mp4")
+    assert spans == ((0.1, 0.4),)
 
 
 @pytest.mark.parametrize(

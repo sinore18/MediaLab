@@ -48,7 +48,7 @@ Open `http://localhost:3000`; the API is available at `http://localhost:8000`. T
 
 ## Deploy behind Caddy
 
-The root `Caddyfile` configures Caddy on the VPS to serve `dhwani.site`, redirect `/` to `/bleeper`, and reverse proxy requests to the Compose client on `127.0.0.1:3000`. Install Caddy on the VPS and load this file as its configuration. Make sure `dhwani.site` resolves to the VPS IP and that inbound ports 80 and 443 are open; Caddy will provision HTTPS automatically.
+The root `Caddyfile` configures Caddy on the VPS to serve `dhwani.site` and `redact.dhwani.site`. It redirects `/` on `dhwani.site` to `/bleeper` and `/` on `redact.dhwani.site` to `/bleeper/pii-redactions`, then reverse proxies requests to the Compose client on `127.0.0.1:3000` and API requests to `127.0.0.1:8000`. Install Caddy on the VPS and load this file as its configuration. Make sure both domains resolve to the VPS IP and that inbound ports 80 and 443 are open; Caddy will provision HTTPS automatically.
 
 The Compose services are capped at a combined 1 vCPU and 512 MB RAM: the API gets 0.75 CPU / 384 MB and the client gets 0.25 CPU / 128 MB. These are strict container limits, not recommendations for reliable transcription. The API loads the torchaudio MMS_FA alignment model in memory, so transcription may be slow or the API may be killed for exceeding its memory limit. Increase the API memory allocation (and the overall VPS memory) if that occurs. Image builds are not subject to these runtime container limits.
 

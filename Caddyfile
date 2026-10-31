@@ -10,3 +10,29 @@ dhwani.site {
         reverse_proxy 127.0.0.1:3000
     }
 }
+
+redact.dhwani.site {
+    @root path /
+    redir @root /bleeper/pii-redactions 308
+
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    handle {
+        reverse_proxy 127.0.0.1:3000
+    }
+}
+
+transcribe.dhwani.site {
+    @root path /
+    redir @root /bleeper/transcribe 308
+
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    handle {
+        reverse_proxy 127.0.0.1:3000
+    }
+}

@@ -5,18 +5,24 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote
 from uuid import uuid4
 
 import httpx
 
 from server.config import Settings
-from server.domain.schemas import ProfanitySpan, WordTiming
+from server.domain.schemas import (
+    AlignedWord,
+    DetectionSpan,
+    ProfanitySpan,
+    WordTiming,
+)
 from server.services.processing.local_aligner import (
     LocalMMSWordAligner,
 )
 from server.services.processing.pipeline import ProcessingPipeline
+from server.services.processing.redaction import prepare_redaction_intervals
 
 logger = logging.getLogger(__name__)
 AUDIO_DIRECTORY = Path(__file__).resolve().parents[4] / "audio"
@@ -67,10 +73,17 @@ class FfmpegAudioExtractor:
 
 
 class LocalWhisperSpeechToText:
-    def __init__(self, model_name: str, device: str, language: str) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        device: str,
+        language: str,
+        log_transcript: bool = True,
+    ) -> None:
         self.model_name = model_name
         self.device = device
         self.language = language
+        self.log_transcript = log_transcript
         self._model: Any | None = None
 
     def transcribe(self, audio_path: Path) -> str:
@@ -88,10 +101,11 @@ class LocalWhisperSpeechToText:
             if isinstance(result, dict)
             else getattr(result, "text", "")
         )
-        logger.info(
-            "speech-to-text output provider=whisper transcript=%s",
-            json.dumps(str(transcript), ensure_ascii=False),
-        )
+        if self.log_transcript:
+            logger.info(
+                "speech-to-text output provider=whisper transcript=%s",
+                json.dumps(str(transcript), ensure_ascii=False),
+            )
         return str(transcript).strip()
 
 
@@ -103,6 +117,7 @@ class VachanaSpeechToText:
         api_key_id: str,
         language_code: str = "indic-auto",
         use_domain_vocabulary: bool = True,
+        log_transcript: bool = True,
     ) -> None:
         if not api_key_id.strip():
             raise LocalProcessingError(
@@ -111,6 +126,7 @@ class VachanaSpeechToText:
         self.api_key_id = api_key_id.strip()
         self.language_code = language_code
         self.use_domain_vocabulary = use_domain_vocabulary
+        self.log_transcript = log_transcript
 
     def transcribe(self, audio_path: Path) -> str:
         audio = audio_path.read_bytes()
@@ -177,10 +193,11 @@ class VachanaSpeechToText:
         transcript = result.get("transcript")
         if not isinstance(transcript, str) or not transcript.strip():
             raise LocalProcessingError("Vachana STT returned an empty transcript.")
-        logger.info(
-            "speech-to-text output provider=vachana transcript=%s",
-            json.dumps(transcript, ensure_ascii=False),
-        )
+        if self.log_transcript:
+            logger.info(
+                "speech-to-text output provider=vachana transcript=%s",
+                json.dumps(transcript, ensure_ascii=False),
+            )
         return transcript.strip()
 
 
@@ -196,6 +213,34 @@ class GeminiProfanityDetector:
             raise LocalProcessingError("GEMINI_MODEL must not be empty.")
 
     def find_matches(self, words: Sequence[WordTiming]) -> list[ProfanitySpan]:
+        """Preserve the original detector API while exposing the plugin contract."""
+        spans = self.detect(
+            [
+                AlignedWord(
+                    word=word.word,
+                    start=word.start_seconds,
+                    end=word.end_seconds,
+                )
+                for word in words
+            ]
+        )
+        return [
+            ProfanitySpan(
+                word=" ".join(
+                    word.word
+                    for word in words[span.first_word_idx : span.last_word_idx + 1]
+                ),
+                start_seconds=span.start,
+                end_seconds=span.end,
+                kind=(
+                    "word" if span.first_word_idx == span.last_word_idx else "phrase"
+                ),
+            )
+            for span in spans
+        ]
+
+    def detect(self, words: Sequence[AlignedWord]) -> list[DetectionSpan]:
+        """Detect profanity and return its inclusive aligned-word range."""
         if not words:
             return []
 
@@ -316,16 +361,15 @@ class GeminiProfanityDetector:
             else:
                 merged_ranges.append((start_index, end_index))
 
-        matches: list[ProfanitySpan] = []
+        matches: list[DetectionSpan] = []
         for start_index, end_index in merged_ranges:
             matches.append(
-                ProfanitySpan(
-                    word=" ".join(
-                        timing.word for timing in words[start_index : end_index + 1]
-                    ),
-                    start_seconds=words[start_index].start_seconds,
-                    end_seconds=words[end_index].end_seconds,
-                    kind="word" if start_index == end_index else "phrase",
+                DetectionSpan(
+                    category="profanity",
+                    first_word_idx=start_index,
+                    last_word_idx=end_index,
+                    start=words[start_index].start,
+                    end=words[end_index].end,
                 )
             )
 
@@ -402,6 +446,67 @@ class FfmpegBleepRenderer:
         _run_ffmpeg(arguments, "video rendering")
         return output_path
 
+    def render_audio(
+        self,
+        audio_path: Path,
+        spans: Sequence[DetectionSpan],
+        output_path: Path,
+        *,
+        duration_seconds: float,
+        mode: Literal["beep", "silence"] = "beep",
+        margin_seconds: float = 0.08,
+        merge_gap_seconds: float = 0.15,
+        fade_seconds: float = 0.005,
+    ) -> Path:
+        """Redact PII spans from audio with padded beeps or silence."""
+        if mode not in {"beep", "silence"}:
+            raise ValueError("mode must be 'beep' or 'silence'.")
+        if not 0.005 <= fade_seconds <= 0.01:
+            raise ValueError("fade_seconds must be between 0.005 and 0.01 seconds.")
+        intervals = prepare_redaction_intervals(
+            ((span.start, span.end) for span in spans),
+            duration_seconds=duration_seconds,
+            margin_seconds=margin_seconds,
+            merge_gap_seconds=merge_gap_seconds,
+        )
+        arguments = ["-i", str(audio_path)]
+        if intervals:
+            conditions = "+".join(
+                f"between(t,{start:.6f},{end:.6f})" for start, end in intervals
+            )
+            filters = [f"[0:a]volume=0:enable='{conditions}'[clean]"]
+            if mode == "beep":
+                bleep_inputs: list[str] = []
+                for index, (start, end) in enumerate(intervals):
+                    delay_ms = round(start * 1000)
+                    span_duration = end - start
+                    fade_duration = min(fade_seconds, span_duration / 2)
+                    fade_out_start = max(0.0, span_duration - fade_duration)
+                    filters.append(
+                        f"sine=frequency=1000:sample_rate=48000:duration={span_duration:.6f},"
+                        f"volume=0.25,afade=t=in:st=0:d={fade_duration:.6f},"
+                        f"afade=t=out:st={fade_out_start:.6f}:d={fade_duration:.6f},"
+                        f"adelay={delay_ms}|{delay_ms}[bleep{index}]"
+                    )
+                    bleep_inputs.append(f"[bleep{index}]")
+                filters.append(
+                    f"[clean]{''.join(bleep_inputs)}amix=inputs={len(intervals) + 1}:"
+                    "duration=first:normalize=0:dropout_transition=0[aout]"
+                )
+                output_label = "[aout]"
+            else:
+                filters.append("[clean]anull[aout]")
+                output_label = "[aout]"
+            arguments.extend(
+                ["-filter_complex", ";".join(filters), "-map", output_label]
+            )
+        else:
+            arguments.extend(["-map", "0:a:0"])
+
+        arguments.extend(["-vn", "-c:a", "pcm_s16le", str(output_path)])
+        _run_ffmpeg(arguments, "audio redaction")
+        return output_path
+
 
 class LocalVideoProcessor:
     def __init__(
@@ -459,6 +564,7 @@ def create_speech_to_text_provider(
     settings: Settings,
     language_code: str | None = None,
     use_domain_vocabulary: bool = True,
+    log_transcript: bool = True,
 ) -> LocalWhisperSpeechToText | VachanaSpeechToText:
     provider = settings.stt_provider.strip().casefold()
     if provider in {"vachana", "gnani"}:
@@ -466,12 +572,14 @@ def create_speech_to_text_provider(
             api_key_id=settings.stt_api_key.get_secret_value(),
             language_code=language_code or settings.stt_language_code,
             use_domain_vocabulary=use_domain_vocabulary,
+            log_transcript=log_transcript,
         )
     if provider in {"local", "whisper"}:
         return LocalWhisperSpeechToText(
             model_name=settings.local_stt_model,
             device=settings.local_stt_device,
             language=settings.local_stt_language,
+            log_transcript=log_transcript,
         )
     raise LocalProcessingError(f"Unsupported STT_PROVIDER: {settings.stt_provider!r}.")
 

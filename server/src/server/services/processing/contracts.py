@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
-from server.domain.schemas import ProfanitySpan, WordTiming
+from server.domain.schemas import AlignedWord, DetectionSpan, ProfanitySpan, WordTiming
 
 
 class SpeechToTextProvider(Protocol):
@@ -15,6 +15,11 @@ class WordAligner(Protocol):
 
 class ProfanityDetector(Protocol):
     def find_matches(self, words: Sequence[WordTiming]) -> Sequence[ProfanitySpan]: ...
+
+
+@runtime_checkable
+class DetectorPlugin(Protocol):
+    def detect(self, words: Sequence[AlignedWord]) -> Sequence[DetectionSpan]: ...
 
 
 class BleepRenderer(Protocol):

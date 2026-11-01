@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Bleeper | Audio & video studio",
+  title: " PII Redaction Studio",
   description: "Transcribe audio with word-level timestamps or clean up your video.",
 };
 

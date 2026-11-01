@@ -11,6 +11,7 @@ import {
   FileText,
   LoaderCircle,
   LockKeyhole,
+  Mic,
   RotateCcw,
   ShieldCheck,
   Upload,
@@ -525,12 +526,35 @@ export default function PiiRedactionsPage() {
                 </details>
               </div>
             ) : (
-              <div className="pii-empty">
-                <span className="pii-empty-core"><ShieldCheck size={23} /></span>
-                <h3>A safer version starts here.</h3>
-                <p>Upload an audio file to receive redacted playback and a tagged transcript.</p>
-                <div className="pii-empty-flow"><span>DETECT</span><i /><span>REDACT</span><i /><span>VERIFY</span></div>
-              </div>
+              workState === "processing" ? (
+                <div className="pii-processing-state" role="status" aria-live="polite">
+                  <div className="pii-signal-scene" aria-hidden="true">
+                    <div className="pii-signal-wave pii-signal-wave-before">
+                      {Array.from({ length: 9 }, (_, index) => <span key={index} />)}
+                    </div>
+                    <span className="pii-mic-shell"><Mic size={34} strokeWidth={1.6} /></span>
+                    <div className="pii-signal-wave pii-signal-wave-after">
+                      {Array.from({ length: 9 }, (_, index) => <span key={index} />)}
+                    </div>
+                  </div>
+                  <p className="pii-kicker">AUDIO PIPELINE / LIVE</p>
+                  <h3>Processing your recording</h3>
+                  <p className="pii-processing-copy">
+                    Listening for sensitive details, redacting them from the audio, and
+                    verifying the clean copy.
+                  </p>
+                  <div className="pii-processing-flow" aria-hidden="true">
+                    <span>DETECT</span><i /><span>REDACT</span><i /><span>VERIFY</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="pii-empty">
+                  <span className="pii-empty-core"><ShieldCheck size={23} /></span>
+                  <h3>A safer version starts here.</h3>
+                  <p>Upload an audio file to receive redacted playback and a tagged transcript.</p>
+                  <div className="pii-empty-flow"><span>DETECT</span><i /><span>REDACT</span><i /><span>VERIFY</span></div>
+                </div>
+              )
             )}
             <div className="pii-result-foot">
               <span><ShieldCheck size={13} /> NO RAW PII IN AUDIT</span>

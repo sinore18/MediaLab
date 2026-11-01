@@ -34,6 +34,7 @@ _VERHOEFF_INV = (0, 4, 3, 2, 1, 5, 6, 7, 8, 9)
 _OTP_CUES = {
     "code",
     "otp",
+    "ओटीपी",
     "passcode",
     "password",
     "pin",

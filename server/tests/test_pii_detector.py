@@ -104,6 +104,16 @@ def test_detector_finds_otp_with_cue_across_a_short_pause() -> None:
     assert (spans[0].first_word_idx, spans[0].last_word_idx) == (3, 6)
 
 
+def test_detector_finds_otp_with_hindi_cue_and_numeric_token() -> None:
+    words = _words(["हाँ", "ओटीपी", "है", "482915।"])
+
+    spans = PiiDetector().detect(words)
+
+    assert len(spans) == 1
+    assert spans[0].category == "OTP"
+    assert (spans[0].first_word_idx, spans[0].last_word_idx) == (3, 3)
+
+
 def test_detector_splits_long_pause_and_corrects_no_wait_digit() -> None:
     tokens = [
         "nine",

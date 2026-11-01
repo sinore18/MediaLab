@@ -400,7 +400,7 @@ export default function PiiRedactionsPage() {
 
             <div className="pii-file-limits">
               <span><Check size={13} /> Up to 100 MB</span>
-              <span><Clock3 size={13} /> Up to 60 seconds</span>
+              <span><Clock3 size={13} /> Up to 30 seconds</span>
               <span>WAV · MP3 · M4A · WebM</span>
             </div>
             <div className="pii-processing-note">

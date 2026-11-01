@@ -13,7 +13,6 @@ import {
   LockKeyhole,
   RotateCcw,
   ShieldCheck,
-  Sparkles,
   Upload,
   X,
 } from "lucide-react";
@@ -418,7 +417,7 @@ export default function PiiRedactionsPage() {
               ) : workState === "done" ? (
                 <><RotateCcw size={16} /> Redact again</>
               ) : (
-                <><Sparkles size={16} /> Redact spoken PII <ChevronRight size={16} /></>
+                <><ShieldCheck size={16} /> Redact spoken PII <ChevronRight size={16} /></>
               )}
             </button>
             {message && (
@@ -527,11 +526,7 @@ export default function PiiRedactionsPage() {
               </div>
             ) : (
               <div className="pii-empty">
-                <span className="pii-empty-orbit orbit-a" />
-                <span className="pii-empty-orbit orbit-b" />
                 <span className="pii-empty-core"><ShieldCheck size={23} /></span>
-                <Sparkles className="pii-empty-spark spark-a" size={14} />
-                <Sparkles className="pii-empty-spark spark-b" size={11} />
                 <h3>A safer version starts here.</h3>
                 <p>Upload an audio file to receive redacted playback and a tagged transcript.</p>
                 <div className="pii-empty-flow"><span>DETECT</span><i /><span>REDACT</span><i /><span>VERIFY</span></div>

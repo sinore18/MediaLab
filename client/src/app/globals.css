@@ -4383,3 +4383,520 @@ h1 em {
     transition-duration: 0.01ms !important;
   }
 }
+
+.pii-page {
+  --pii-bg: #f5f7fa;
+  --pii-surface: #ffffff;
+  --pii-raised: #f8fafc;
+  --pii-line: #dce3eb;
+  --pii-text: #1b2b40;
+  --pii-muted: #59697c;
+  --pii-dim: #718096;
+  --pii-accent: #24527a;
+  --pii-accent-deep: #3e6e91;
+  overflow-x: hidden;
+  background: var(--pii-bg);
+  color: var(--pii-text);
+  color-scheme: light;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+html:has(.pii-page),
+body:has(.pii-page) {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html:has(.pii-page)::-webkit-scrollbar,
+body:has(.pii-page)::-webkit-scrollbar {
+  display: none;
+}
+
+.pii-page button:focus-visible,
+.pii-page [role="button"]:focus-visible,
+.pii-page a:focus-visible,
+.pii-page summary:focus-visible {
+  outline-color: var(--pii-accent);
+}
+
+.pii-topbar {
+  background: #ffffff;
+}
+
+.pii-brand-mark {
+  border-color: #d9e3ed;
+  border-radius: 8px;
+  background: #f0f4f8;
+}
+
+.pii-brand-divider,
+.pii-step i,
+.pii-privacy,
+.pii-eyebrow,
+.pii-kicker,
+.pii-intro,
+.pii-hero-stamp small,
+.pii-dropzone > small,
+.pii-file-info small,
+.pii-icon-button,
+.pii-mini-label,
+.pii-file-limits,
+.pii-processing-note p,
+.pii-status,
+.pii-lock-badge,
+.pii-section-head,
+.pii-stat span,
+.pii-leaks > span,
+.pii-leaks small,
+.pii-audit-details summary small,
+.pii-detection-row small,
+.pii-detection-list > p,
+.pii-detection-list > code,
+.pii-empty > p,
+.pii-empty-flow,
+.pii-result-foot,
+.pii-footer {
+  color: var(--pii-muted);
+}
+
+.pii-nav a {
+  color: var(--pii-muted);
+  font-size: 12px;
+}
+
+.pii-nav a:hover,
+.pii-nav a.is-current {
+  color: var(--pii-text);
+}
+
+.pii-nav a.is-current {
+  border-bottom-color: var(--pii-accent);
+}
+
+.pii-privacy {
+  font-size: 10px;
+}
+
+.pii-content {
+  padding-top: 48px;
+}
+
+.pii-eyebrow,
+.pii-kicker {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.pii-eyebrow {
+  margin-bottom: 13px;
+}
+
+.pii-eyebrow > span {
+  background: var(--pii-accent);
+  box-shadow: 0 0 0 4px #eaf0f6;
+}
+
+.pii-eyebrow i {
+  background: #aab6c3;
+}
+
+.pii-hero h1 {
+  color: var(--pii-text);
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  font-size: clamp(42px, 5vw, 58px);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+
+.pii-hero h1 em {
+  color: var(--pii-accent);
+  font-style: normal;
+  font-weight: 650;
+}
+
+.pii-intro {
+  max-width: 520px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.pii-hero-stamp {
+  border-color: var(--pii-line);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgb(23 43 66 / 5%);
+}
+
+.pii-stamp-icon,
+.pii-stamp-check {
+  color: var(--pii-accent);
+}
+
+.pii-stamp-icon {
+  border-color: #dce6ef;
+  border-radius: 9px;
+  background: #f0f4f8;
+}
+
+.pii-hero-stamp strong,
+.pii-panel-head h2,
+.pii-dropzone > strong,
+.pii-file-info strong,
+.pii-processing-note strong,
+.pii-output-topline > strong,
+.pii-transcript-text,
+.pii-stat strong,
+.pii-audit-details summary,
+.pii-detection-row,
+.pii-empty h3 {
+  color: var(--pii-text);
+}
+
+.pii-hero-stamp strong {
+  font-size: 12px;
+}
+
+.pii-hero-stamp small {
+  font-size: 10px;
+}
+
+.pii-stamp-check {
+  background: #edf3f7;
+}
+
+.pii-panel {
+  border-color: var(--pii-line);
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 2px 9px rgb(23 43 66 / 5%);
+}
+
+.pii-source {
+  padding: 24px;
+}
+
+.pii-panel-head h2 {
+  font-size: 18px;
+}
+
+.pii-step {
+  border-color: var(--pii-line);
+  color: var(--pii-accent);
+  font-size: 10px;
+}
+
+.pii-dropzone {
+  min-height: 190px;
+  border-color: #bdc9d6;
+  border-radius: 9px;
+  background: #fbfcfd;
+}
+
+.pii-dropzone:hover,
+.pii-dropzone.is-dragging {
+  transform: none;
+  border-color: var(--pii-accent);
+  background: #f4f8fb;
+}
+
+.pii-dropzone.has-file {
+  border-color: var(--pii-line);
+  background: #fbfcfd;
+}
+
+.pii-upload-icon,
+.pii-file-icon,
+.pii-output-icon {
+  border-color: #dce6ef;
+  border-radius: 9px;
+  background: #eff4f8;
+  color: var(--pii-accent);
+}
+
+.pii-dropzone > strong {
+  font-size: 13px;
+}
+
+.pii-dropzone > small,
+.pii-file-info small {
+  font-size: 11px;
+}
+
+.pii-browse {
+  border-color: #cdd8e3;
+  border-radius: 6px;
+  color: var(--pii-accent);
+  font-size: 11px;
+}
+
+.pii-file-info strong {
+  font-size: 12px;
+}
+
+.pii-file-limits {
+  font-size: 10px;
+}
+
+.pii-file-limits svg,
+.pii-processing-note > span,
+.pii-mini-label {
+  color: var(--pii-accent-deep);
+}
+
+.pii-processing-note {
+  border-color: #dce6ef;
+  border-radius: 8px;
+  background: #f5f8fb;
+}
+
+.pii-processing-note p {
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.pii-processing-note strong {
+  color: var(--pii-text);
+}
+
+.pii-submit {
+  border-radius: 7px;
+  background: var(--pii-accent);
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.pii-submit:hover:not(:disabled) {
+  transform: none;
+  background: #1c4263;
+  box-shadow: 0 3px 8px rgb(36 82 122 / 16%);
+}
+
+.pii-submit:disabled {
+  border-color: #e2e7ed;
+  background: #edf0f4;
+  color: #7a8795;
+}
+
+.pii-status {
+  font-size: 11px;
+}
+
+.pii-status.is-error,
+.pii-leaks {
+  color: #a13d36;
+}
+
+.pii-status.is-success,
+.pii-ready,
+.pii-ready i {
+  color: #2f6d4f;
+}
+
+.pii-result-head {
+  border-bottom-color: var(--pii-line);
+}
+
+.pii-ready,
+.pii-lock-badge {
+  border-color: #dce6ef;
+  border-radius: 999px;
+  background: #f5f8fb;
+  font-size: 9px;
+}
+
+.pii-ready i {
+  background: #3b805e;
+  box-shadow: 0 0 0 3px #e9f3ed;
+}
+
+.pii-lock-badge {
+  color: var(--pii-muted);
+}
+
+.pii-output-audio {
+  border-color: #dce6ef;
+  border-radius: 8px;
+  background: #f7f9fb;
+}
+
+.pii-output-topline > strong {
+  font-size: 12px;
+}
+
+.pii-download-link,
+.pii-audit-download {
+  color: var(--pii-accent);
+  font-size: 11px;
+}
+
+.pii-download-link:hover,
+.pii-audit-download:hover,
+.pii-footer a:hover {
+  color: #173c5d;
+}
+
+.pii-audio-preview audio,
+.pii-output-main audio {
+  accent-color: var(--pii-accent);
+}
+
+.pii-transcript-card,
+.pii-audit-details {
+  border-color: var(--pii-line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.pii-section-head {
+  border-bottom-color: var(--pii-line);
+  font-size: 9px;
+}
+
+.pii-section-head svg,
+.pii-verified svg,
+.pii-result-foot svg {
+  color: var(--pii-accent);
+}
+
+.pii-transcript-text {
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  font-size: 13px;
+}
+
+.pii-transcript-text:empty::after {
+  color: var(--pii-muted);
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.pii-stat {
+  border-color: var(--pii-line);
+  border-radius: 7px;
+  background: #fbfcfd;
+}
+
+.pii-stat span {
+  font-size: 8px;
+}
+
+.pii-stat strong {
+  font-size: 16px;
+}
+
+.pii-verified {
+  border-color: #d8e8de;
+  border-radius: 7px;
+  background: #f2f8f4;
+  color: #35654d;
+  font-size: 10px;
+}
+
+.pii-leaks {
+  border-color: #f0d7d4;
+  border-radius: 7px;
+  background: #fdf5f4;
+  font-size: 10px;
+}
+
+.pii-leaks > span,
+.pii-leaks small {
+  color: #8d514b;
+  font-size: 9px;
+}
+
+.pii-audit-details summary {
+  font-size: 11px;
+}
+
+.pii-audit-details summary small {
+  font-size: 9px;
+}
+
+.pii-detection-row,
+.pii-detection-list > p {
+  font-size: 10px;
+}
+
+.pii-detection-row strong {
+  color: var(--pii-accent);
+}
+
+.pii-detection-row small,
+.pii-detection-list > code {
+  color: var(--pii-muted);
+}
+
+.pii-empty {
+  min-height: 390px;
+}
+
+.pii-empty-orbit,
+.pii-empty-spark {
+  display: none;
+}
+
+.pii-empty-core {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  border-color: #dce6ef;
+  border-radius: 10px;
+  background: #eff4f8;
+  color: var(--pii-accent);
+  box-shadow: none;
+}
+
+.pii-empty h3 {
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  font-size: 19px;
+  font-weight: 650;
+}
+
+.pii-empty > p {
+  font-size: 12px;
+}
+
+.pii-empty-flow {
+  gap: 8px;
+  font-size: 9px;
+}
+
+.pii-empty-flow i {
+  background: #cbd5df;
+}
+
+.pii-result-foot {
+  border-top-color: var(--pii-line);
+  font-size: 8px;
+}
+
+.pii-footer {
+  color: var(--pii-muted);
+  font-size: 10px;
+}
+
+.pii-footer a {
+  color: var(--pii-accent);
+}
+
+@media (max-width: 560px) {
+  .pii-nav {
+    gap: 10px;
+  }
+
+  .pii-nav a {
+    font-size: 0;
+  }
+
+  .pii-privacy {
+    font-size: 0;
+  }
+
+  .pii-hero h1 {
+    font-size: 42px;
+  }
+
+  .pii-intro {
+    font-size: 13px;
+  }
+}

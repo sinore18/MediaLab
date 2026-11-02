@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://dhwani.site/bleeper"),
   title: " PII Redaction Studio",
   description: "Transcribe audio with word-level timestamps or clean up your video.",
 };

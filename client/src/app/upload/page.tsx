@@ -134,7 +134,7 @@ export default function Home() {
       if (probe.duration > MAX_DURATION_SECONDS) {
         setVideo(null);
         setUploadState("error");
-        setMessage("This video is over the 10 minute duration limit.");
+        setMessage("This video is over the 30 seconds duration limit.");
         return;
       }
       setVideo({ file, durationSeconds: probe.duration });

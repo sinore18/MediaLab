@@ -157,7 +157,7 @@ export default function TranscribePage() {
       }
       if (probe.duration > MAX_DURATION_SECONDS) {
         setWorkState("error");
-        setMessage("This audio is over the 10 minute duration limit.");
+        setMessage("This audio is over the 30 seconds duration limit.");
         return;
       }
       setAudioPreview(file, probe.duration);

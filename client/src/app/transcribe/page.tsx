@@ -325,10 +325,10 @@ const result = await response.json();`;
   return (
     <main className="transcribe-page">
       <header className="transcribe-topbar">
-        <Link className="transcribe-brand" href="/" aria-label="Bleeper home">
+        <div className="transcribe-brand">
           <span className="transcribe-brand-mark"><AudioLines size={18} strokeWidth={2.2} /></span>
-          <span>bleeper<span className="brand-divider">/</span>studio</span>
-        </Link>
+          <span>transcription studio</span>
+        </div>
         <nav className="transcribe-nav" aria-label="Studio navigation">
           <a className="nav-active" href="/transcribe"><Waves size={15} /> Transcription</a>
           <Link href="/upload"><FileAudio2 size={15} /> Video cleanup</Link>
@@ -644,7 +644,6 @@ const result = await response.json();`;
 
         <footer className="transcribe-footer">
           <span>Made for listening closely.</span>
-          <Link href="/">Back to Bleeper <ChevronRight size={14} /></Link>
         </footer>
       </div>
     </main>

@@ -12,8 +12,15 @@ def test_audio_transcription_returns_aligned_words(monkeypatch) -> None:
     monkeypatch.setattr(
         transcriptions, "get_settings", lambda: Settings(stt_provider="gnani")
     )
+    probe_paths = []
+
+    def fake_duration_seconds(_self, media_path):
+        probe_paths.append(media_path)
+        assert media_path.suffix == ".webm"
+        return 4.2
+
     monkeypatch.setattr(
-        transcriptions.MediaProbeService, "duration_seconds", lambda _self, _path: 4.2
+        transcriptions.MediaProbeService, "duration_seconds", fake_duration_seconds
     )
     extracted_paths = []
     requested_languages = []
@@ -58,7 +65,7 @@ def test_audio_transcription_returns_aligned_words(monkeypatch) -> None:
     response = client.post(
         "/api/v1/transcriptions",
         data={"language_code": "hi-IN"},
-        files={"file": ("sample.wav", b"audio-bytes", "audio/wav")},
+        files={"file": ("voice-recording.webm", b"audio-bytes", "audio/webm")},
     )
 
     assert response.status_code == 200
@@ -66,10 +73,21 @@ def test_audio_transcription_returns_aligned_words(monkeypatch) -> None:
         "transcript": "Hello there.",
         "duration_seconds": 4.2,
         "words": [
-            {"word": "Hello", "start_seconds": 0.1, "end_seconds": 0.6},
-            {"word": "there.", "start_seconds": 0.7, "end_seconds": 1.1},
+            {
+                "word": "Hello",
+                "start_seconds": 0.1,
+                "end_seconds": 0.6,
+                "approximate": False,
+            },
+            {
+                "word": "there.",
+                "start_seconds": 0.7,
+                "end_seconds": 1.1,
+                "approximate": False,
+            },
         ],
     }
+    assert len(probe_paths) == 1
     assert extracted_paths[0].suffix == ".wav"
     assert requested_languages == [("indic-auto", False), "indic-auto"]
 

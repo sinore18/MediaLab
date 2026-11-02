@@ -22,6 +22,22 @@ from server.services.processing.local_processing import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 TRANSCRIPTION_LANGUAGE_CODE = "indic-auto"
+SUPPORTED_AUDIO_SUFFIXES = {
+    ".3gp",
+    ".aac",
+    ".aiff",
+    ".amr",
+    ".flac",
+    ".m4a",
+    ".mp3",
+    ".mp4",
+    ".oga",
+    ".ogg",
+    ".opus",
+    ".wav",
+    ".webm",
+    ".wma",
+}
 
 
 @router.post("", response_model=TranscriptionResponse)
@@ -50,7 +66,10 @@ async def transcribe_audio(
         )
 
     working_directory = Path(tempfile.mkdtemp(prefix="bleeper-transcription-"))
-    audio_path = working_directory / "audio"
+    audio_suffix = Path(file.filename or "").suffix.lower()
+    if audio_suffix not in SUPPORTED_AUDIO_SUFFIXES:
+        audio_suffix = ""
+    audio_path = working_directory / f"audio{audio_suffix}"
     normalized_audio_path = working_directory / "normalized.wav"
     total_bytes = 0
     try:
@@ -103,7 +122,7 @@ async def transcribe_audio(
         raise
     except MediaProbeError as error:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
         ) from error
     except LocalProcessingError as error:
         log_exception(logger, "audio transcription failed")
@@ -113,7 +132,7 @@ async def transcribe_audio(
     except LocalAlignmentError as error:
         log_exception(logger, "audio word alignment failed")
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(error)
         ) from error
     except OSError as error:
         log_exception(

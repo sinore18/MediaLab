@@ -191,7 +191,7 @@ export default function PiiRedactionsPage() {
       }
       if (metadataAudio.duration > MAX_DURATION_SECONDS) {
         setWorkState("error");
-        setMessage("This recording is over the 10 minute duration limit.");
+        setMessage("This recording is over the 30 seconds duration limit.");
         return;
       }
       if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);

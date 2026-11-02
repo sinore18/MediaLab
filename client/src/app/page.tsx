@@ -91,7 +91,7 @@ export default function Home() {
             <span className="step-index">01</span>
             <div className="step-icon"><FileVideo2 size={20} /></div>
             <h3>Bring your video</h3>
-            <p>Drop in a clip up to 10 minutes long and let the studio take it from here.</p>
+            <p>Drop in a clip up to 30 seconds long and let the studio take it from here.</p>
           </article>
           <article className="landing-step">
             <span className="step-index">02</span>

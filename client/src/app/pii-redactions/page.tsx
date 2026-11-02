@@ -285,10 +285,10 @@ export default function PiiRedactionsPage() {
   return (
     <main className="pii-page">
       <header className="pii-topbar">
-        <Link className="pii-brand" href="/" aria-label="Bleeper home">
+        <div className="pii-brand">
           <span className="pii-brand-mark"><AudioLines size={18} strokeWidth={2.2} /></span>
-          <span>bleeper<span className="pii-brand-divider">/</span>secure audio</span>
-        </Link>
+          <span>secure audio</span>
+        </div>
         <nav className="pii-nav" aria-label="Studio navigation">
           <Link className="is-current" href="/pii-redactions"><ShieldCheck size={15} /> PII redaction</Link>
           <Link href="/transcribe"><AudioLines size={15} /> Transcription</Link>

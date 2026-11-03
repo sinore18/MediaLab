@@ -1,59 +1,191 @@
-# Bleeper
+# Spoken PII Redaction
 
-Video profanity-cleanup starter with a Next.js client and a Python/FastAPI API.
+Spoken account details are easy to overlook: a support call, voice note, or interview may contain a card number, an OTP, or another identifier even when the recording was never meant to disclose it. Sharing the original audio can expose that information, while manual review and editing are slow and difficult to audit.
 
-## Start locally
+This project turns spoken-PII cleanup into a repeatable workflow. Upload an audio recording and receive a version with detected identifiers replaced by beeps, a transcript with sensitive spans masked, and a metadata-only audit file. It is designed to help people review and minimize exposure before sharing recordings—not to guarantee that every sensitive detail has been found.
 
-1. Set `PROD=false` in the root `.env` for development logging. The selected video is sent to the API, validated and processed there, then returned to the browser for preview. `PROD=true` uses the same upload and processing flow; it only changes production logging.
-2. Install FFmpeg so `ffprobe` is available on `PATH`.
-3. In one terminal, run `cd server` and `uv run server`.
-4. In another terminal, run `cd client` and `npm run dev`.
-5. Open `http://localhost:3000`.
+## What it does
 
-The audio workspace is available at `http://localhost:3000/transcribe`. It supports microphone recording and audio uploads, then sends the audio to the configured Gnani-compatible STT provider and torchaudio MMS_FA aligner via `POST /api/v1/transcriptions`. Select Hindi or English in the workspace so Gnani and the aligner use the same language; verbatim transcription omits the video-cleanup pipeline's custom substitutions and keyword bias. Configure `STT_PROVIDER=gnani`, `STT_API_KEY`, and `STT_LANGUAGE_CODE` in the root `.env`; FFmpeg/ffprobe and the MMS_FA model dependencies must be available to the API.
+The PII redaction workspace is available at `https://redact.dhwani.site/`. It accepts audio uploads and returns a ZIP containing:
 
-Set `PROD=true` to enable production logging. It does not change the upload, processing, or download architecture, and no Azure storage configuration is needed.
+- `redacted_audio.wav` — normalized audio with detected spans replaced by a tone.
+- `redacted_transcript.txt` — aligned transcript with detections replaced by category tags such as `[CARD]` or `[OTP]`.
+- `audit.json` — the original file's SHA-256 digest, detection categories and timestamps, and reverification metrics. Detected values are not included.
 
-## Run with Docker Compose
+The detector currently targets:
 
-Copy `.env.example` to `.env` and set the required API credentials. Build the server runtime once on the VM; it contains the OS packages and Python dependencies:
+| Category | Detection approach |
+| --- | --- |
+| Payment card | 13–19 spoken digits with a valid Luhn checksum |
+| Aadhaar | 12-digit candidate with the expected first digit and valid Verhoeff checksum |
+| Indian mobile | 10-digit candidate beginning with 6–9 |
+| PAN | Indian PAN structural pattern |
+| IFSC | Indian IFSC structural pattern |
+| OTP | 4–8 digits near a cue such as “OTP”, “code”, “PIN”, “password”, or “verification” |
 
-```bash
-docker compose --profile runtime-build build server-runtime
+Spoken digit normalization includes English, common Hinglish, and Devanagari number words and numerals. It also handles common spoken-number repetition and correction patterns. These are targeted heuristics, not a general-purpose detector: names, addresses, email addresses, and arbitrary identifiers are not currently in scope. A checksum or format match does not establish that an identifier is real or belongs to anyone.
+
+## How it works
+
+```text
+Browser
+  └─ multipart audio upload
+       └─ FastAPI validation and temporary workspace
+            ├─ FFmpeg: normalize audio to mono 16 kHz WAV
+            ├─ STT: Vachana/Gnani API or local Whisper
+            ├─ torchaudio MMS_FA + uroman: word-level timings
+            ├─ spoken-number normalization and PII validation
+            ├─ FFmpeg: replace padded/merged PII intervals with beeps
+            ├─ repeat STT, alignment, and detection on redacted audio
+            └─ ZIP redacted audio, masked transcript, and audit metadata
 ```
 
-Build and start the application images:
+The FastAPI endpoint uses STT with automatic Indic language detection (`indic-auto`) when using Vachana. The MMS_FA aligner is local; it aligns the transcript to audio so detected words can be redacted at their timestamps. Redactions include an 80 ms margin on either side by default, are clipped to the recording, and nearby intervals are merged.
 
-```bash
-docker compose build
-docker compose up -d
+Reverification measures whether the same detector finds initial detections again after redaction. `pii_recall` in the audit is the fraction of initial spans *not* detected again; `leaked_items` lists any remaining detections by category and time; `seconds_over_redacted` estimates redacted time outside the original detected spans. These are useful checks, not a proof of complete redaction: STT and detection can miss speech, and reverification uses the same pipeline.
+
+## Privacy and operational considerations
+
+- The PII route suppresses transcript logging and excludes detected source values from the transcript tags and audit. The audit still contains categories, timings, confidence/validator metadata, and the original audio's SHA-256 digest.
+- Input, normalized audio, and intermediate outputs are staged in a temporary directory on the API host and removed after request completion. A forced process/host shutdown can leave temporary files behind; secure the host and its temporary storage accordingly.
+- With `STT_PROVIDER=vachana` (or `gnani`), the audio is sent to the configured Vachana STT service for transcription. Review that provider's data handling and retention terms before uploading sensitive recordings. Use `STT_PROVIDER=local` to run Whisper locally instead; local models may be downloaded the first time they are used.
+- The browser receives the ZIP and can preview/download its contents. Use HTTPS in production and limit access to the app/API if recordings are sensitive. This project does not provide user authentication, rate limiting, or a compliance certification.
+- Set upload limits and host capacity deliberately. Audio is processed synchronously; long or concurrent jobs consume CPU, memory, temporary disk, and may require significant time. The default audio limit is 600 seconds and the default upload limit is 500 MB.
+
+## Run locally
+
+### Requirements
+
+- Python 3.13 and [uv](https://docs.astral.sh/uv/)
+- Node.js 22+ and npm
+- FFmpeg, including `ffprobe`, available on `PATH`
+- An STT provider:
+  - Vachana/Gnani API key ID (`STT_PROVIDER=vachana` and `STT_API_KEY`), or
+  - Local Whisper (`STT_PROVIDER=local`; configure its model and language as needed)
+- Network access on first use to fetch the MMS_FA alignment model (and local Whisper model if selected)
+
+From the repository root, copy `.env.example` to `.env` and configure the provider. For example:
+
+```dotenv
+STT_PROVIDER=vachana
+STT_API_KEY=your-vachana-api-key-id
+STT_LANGUAGE_CODE=indic-auto
+MAX_UPLOAD_SIZE_MB=100
+MAX_AUDIO_DURATION_SECONDS=30
+CORS_ORIGINS=
+NEXT_PUBLIC_API_BASE_URL=
 ```
 
-For later server code changes, rebuild only the small server image and recreate that service; the runtime image and installed dependencies are reused:
+Keep `.env` out of version control and do not put provider secrets in `NEXT_PUBLIC_*` variables. For local Whisper instead, set `STT_PROVIDER=local`, remove the need for `STT_API_KEY`, and configure `LOCAL_STT_MODEL`, `LOCAL_STT_DEVICE`, and `LOCAL_STT_LANGUAGE`. The local aligner uses `LOCAL_ALIGNMENT_DEVICE` (CPU by default).
 
-```bash
+Start the API and web client in separate terminals:
+
+```powershell
+cd server
+uv sync
+uv run server
+```
+
+```powershell
+cd client
+npm ci
+npm run dev
+```
+
+## Host with Docker Compose
+
+The repository includes Dockerfiles for a Next.js standalone client and a FastAPI server. The server runtime image installs FFmpeg and the Python dependencies; Compose persists the Torch model cache in a named volume.
+
+1. Install Docker Engine and the Docker Compose plugin on the host. Ensure the host has enough memory, CPU, and temporary disk for audio processing and the alignment model.
+2. Create and configure the root `.env` as above. For an internet-facing deployment, set `CORS_ORIGINS` to the exact browser origin(s). Set `NEXT_PUBLIC_API_BASE_URL` to a URL the user's browser can reach; this value is embedded in the client at image build time.
+3. Build the runtime image, then build and start the application:
+
+   ```powershell
+   docker compose --profile runtime-build build server-runtime
+   docker compose build
+   docker compose up -d
+   ```
+
+4. Verify `http://localhost:8000/health` and open `http://localhost:3000/bleeper/pii-redactions`.
+
+The default Compose client API URL is `http://localhost:8000/api/v1`, suitable for local access. For a public site behind the included Caddy configuration, set the build-time browser URL to your HTTPS API path, for example:
+
+```dotenv
+NEXT_PUBLIC_API_BASE_URL=https://redact.dhwani.site/api/v1
+CORS_ORIGINS=https://redact.dhwani.site
+```
+
+Then rebuild the client (`docker compose build client`) and recreate it (`docker compose up -d client`). The root `Caddyfile` serves `dhwani.site`, `redact.dhwani.site`, and `transcribe.dhwani.site`, routes `/api/*` to the API, and sends the other requests to the client. The PII subdomain redirects its root to `/bleeper/pii-redactions`. Replace these domains with yours; point DNS to the host, allow inbound ports 80/443, and configure Caddy to load the file. Caddy can provision HTTPS certificates automatically when DNS and ports are correct.
+
+The Compose file publishes ports 3000 and 8000. In production, restrict direct access to those ports at the host firewall or bind them to loopback and expose only the reverse proxy. Keep API credentials in the server environment, not in client build arguments other than the public API URL.
+
+For code-only server updates, rebuild and recreate just the server. If Python dependencies change, rebuild the runtime image first:
+
+```powershell
 docker compose build server
 docker compose up -d server
 ```
 
-If `pyproject.toml` or `uv.lock` changes, rebuild the runtime first, then rebuild the server:
-
-```bash
+```powershell
 docker compose --profile runtime-build build server-runtime
 docker compose build server
 docker compose up -d server
 ```
 
-Open `http://localhost:3000`; the API is available at `http://localhost:8000`. The client image uses Next.js standalone output, and the server runtime includes FFmpeg/ffprobe. Audio, logs, and the downloaded PyTorch alignment model are stored in Compose-managed volumes. Set `NEXT_PUBLIC_API_BASE_URL` in the root `.env` to the browser-accessible API URL before building if it is not `http://localhost:8000/api/v1`.
+## API
 
-## Deploy behind Caddy
+`POST /api/v1/pii-redactions` accepts an audio file as multipart field `file` and returns `application/zip`. The route checks for an `audio/*` content type and enforces `MAX_UPLOAD_SIZE_MB` and `MAX_AUDIO_DURATION_SECONDS`. Unsupported uploads return HTTP 415; size/duration violations return HTTP 413. FFmpeg probe failures return HTTP 422, while STT and redaction failures return HTTP 502.
 
-The root `Caddyfile` configures Caddy on the VPS to serve `dhwani.site` and `redact.dhwani.site`. It redirects `/` on `dhwani.site` to `/bleeper` and `/` on `redact.dhwani.site` to `/bleeper/pii-redactions`, then reverse proxies requests to the Compose client on `127.0.0.1:3000` and API requests to `127.0.0.1:8000`. Install Caddy on the VPS and load this file as its configuration. Make sure both domains resolve to the VPS IP and that inbound ports 80 and 443 are open; Caddy will provision HTTPS automatically.
+Example:
 
-The Compose services are capped at a combined 1 vCPU and 512 MB RAM: the API gets 0.75 CPU / 384 MB and the client gets 0.25 CPU / 128 MB. These are strict container limits, not recommendations for reliable transcription. The API loads the torchaudio MMS_FA alignment model in memory, so transcription may be slow or the API may be killed for exceeding its memory limit. Increase the API memory allocation (and the overall VPS memory) if that occurs. Image builds are not subject to these runtime container limits.
+```bash
+curl.exe -f -X POST http://localhost:8000/api/v1/pii-redactions \
+  -F "file=@recording.wav" \
+  -o pii-redaction.zip
+```
 
-## Processing status
+Other settings read from the root `.env`:
 
-Video processing transcribes audio, aligns the transcript with torchaudio MMS_FA for word-level timestamps, asks Gemini to identify profanity in any language, and bleeps the corresponding word or complete multi-word phrase. Gemini returns a standardized JSON object containing `profanity_spans` with inclusive token indexes and a `word` or `phrase` type. Configure `GEMINI_API_KEY` in the root `.env` (the default model is `gemini-3.5-flash-lite`). `PROD` is a server-side logging setting and is not exposed to the client.
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `STT_PROVIDER` | `vachana` | `vachana`/`gnani` for remote STT; `local`/`whisper` for local Whisper |
+| `STT_API_KEY` | empty | Vachana API key ID; required for the remote provider |
+| `STT_LANGUAGE_CODE` | `indic-auto` | Language selection passed to Vachana |
+| `LOCAL_STT_MODEL` | `base` | Whisper model name when using local STT |
+| `LOCAL_STT_DEVICE` | `cpu` | Whisper inference device |
+| `LOCAL_STT_LANGUAGE` | `en` | Whisper language and local alignment language |
+| `LOCAL_ALIGNMENT_DEVICE` | `cpu` | MMS_FA inference device |
+| `MAX_UPLOAD_SIZE_MB` | `500` | API upload size limit |
+| `MAX_AUDIO_DURATION_SECONDS` | `600` | API audio duration limit |
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated allowed browser origins |
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000/api/v1` | Browser API URL, embedded when building the client |
 
-Run API tests with `cd server && uv run pytest`. Run client checks with `cd client && npm run lint && npm run build`.
+`GEMINI_API_KEY` and `GEMINI_MODEL` configure the separate profanity-cleanup workflow; they are not required for spoken PII redaction.
+
+## Command-line redaction
+
+The server package also provides `pii-redact` for processing a local audio file with the same STT, alignment, detection, and reverification pipeline:
+
+```powershell
+cd server
+uv run pii-redact recording.wav --output-dir redacted-recording --mode beep --margin-ms 80
+```
+
+The output directory contains `redacted_audio.wav`, `redacted_transcript.txt`, and `audit.json`. `--mode` accepts `beep` or `silence`; `--margin-ms` sets padding on both sides of each detection. Configure the provider and duration limit in the root `.env` as for the API.
+
+## Development and tests
+
+Run the API test suite and client lint/build checks:
+
+```powershell
+cd server
+uv run pytest
+```
+
+```powershell
+cd client
+npm run lint
+npm run build
+```
+
+The server also serves the existing transcription and video-cleanup routes. Those workflows have their own provider settings and are outside the scope of this PII redaction guide.

@@ -6,7 +6,7 @@ This project turns spoken-PII cleanup into a repeatable workflow. Upload an audi
 
 ## What it does
 
-The PII redaction workspace is available at `https://redact.dhwani.site/`. It accepts audio uploads and returns a ZIP containing:
+The PII redaction workspace is available at https://redact.dhwani.site/. It accepts audio uploads and returns a ZIP containing:
 
 - `redacted_audio.wav` — normalized audio with detected spans replaced by a tone.
 - `redacted_transcript.txt` — aligned transcript with detections replaced by category tags such as `[CARD]` or `[OTP]`.

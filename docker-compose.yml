@@ -45,6 +45,15 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  dashboard:
+    image: nextjs-dashboard:latest
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+
 volumes:
   server-audio:
   server-logs:
